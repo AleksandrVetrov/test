@@ -1,0 +1,123 @@
+image: node:18.16-slim
+
+before_script:
+  - corepack enable
+  - corepack prepare pnpm@latest-8 --activate
+  - pnpm config set store-dir .pnpm-store
+
+variables:
+  USERNAME: admin
+  HOST: "$PROD_HOST"
+
+stages:
+  - install
+  - lint
+  - build
+  - backup
+  - deploy
+
+install:
+  stage: install
+  only:
+    - merge_request
+    - develop
+  script:
+    - pnpm install --no-frozen-lockfile
+  cache:
+    key:
+      files:
+        - pnpm-lock.yaml
+    paths:
+      - .pnpm-store
+    policy: pull-push
+
+lint:
+  stage: lint
+  script:
+    - pnpm install --no-frozen-lockfile
+    - pnpm eslint
+  only:
+    - merge_request
+    - develop
+  cache:
+    key:
+      files:
+        - pnpm-lock.yaml
+    paths:
+      - .pnpm-store
+    policy: pull
+  needs: ["install"]
+
+.build:
+  stage: build
+  artifacts:
+    paths:
+      - dist/
+    when: always
+    expire_in: 1 day
+  cache:
+    key:
+      files:
+        - pnpm-lock.yaml
+    paths:
+      - .pnpm-store
+    policy: pull
+
+build:
+  extends: .build
+  script:
+    - pnpm install --no-frozen-lockfile
+    - pnpm build
+  only:
+    - merge_request
+    - develop
+  needs: ["install"]
+
+.backup:
+  stage: backup
+  image: $CI_REGISTRY/docker/openssh-client:latest
+  script:
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh $USERNAME@$HOST mkdir -p ${APP_PATH}_backup
+    - ssh $USERNAME@$HOST cp -r ${APP_PATH}/* ${APP_PATH}_backup/
+  cache:
+    key:
+      files:
+        - pnpm-lock.yaml
+    paths:
+      - .pnpm-store
+
+backup:
+  extends: .backup
+  before_script:
+    - echo -e "$PRIVATE_SSH_KEY" > ~/.ssh/id_rsa
+  only:
+    - develop
+  needs: ["build"]
+
+.deploy:
+  stage: deploy
+  image: $CI_REGISTRY/docker/openssh-client:latest
+  script:
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh $USERNAME@$HOST mkdir -p ${APP_PATH}_new/
+    - scp -r dist/* $USERNAME@$HOST:${APP_PATH}_new/
+    - ssh $USERNAME@$HOST rm -rf ${APP_PATH}_prev
+    - ssh $USERNAME@$HOST mv ${APP_PATH} ${APP_PATH}_prev
+    - ssh $USERNAME@$HOST mv -T ${APP_PATH}_new ${APP_PATH}
+  cache:
+    key:
+      files:
+        - pnpm-lock.yaml
+    paths:
+      - .pnpm-store
+
+deploy:develop:
+  extends: .deploy
+  environment:
+    name: develop
+  before_script:
+    - echo -e "$PRIVATE_SSH_KEY" > ~/.ssh/id_rsa
+  only:
+    - develop
+  needs: ["build", "lint"]
