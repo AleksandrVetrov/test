@@ -1,13 +1,16 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { System } from '../shared/Types';
+
+
+
+const initialState: System[] = [];
 
 const systemsSlice = createSlice({
   name: 'systems',
-  initialState: {
-    systems: [],
-  },
+  initialState: initialState,
   reducers: {
     setSystems: (state, action) => {
-      state.systems.push(action.payload);
+      state.push(action.payload);
     },
   },
 });

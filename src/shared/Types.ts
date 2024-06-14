@@ -1,5 +1,5 @@
 export type System = {
-  id:string;
+  systemId:string;
   title:string;
   description:string;
   status:string;

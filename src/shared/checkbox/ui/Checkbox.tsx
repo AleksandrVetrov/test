@@ -3,19 +3,17 @@ import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import { FC } from 'react';
 
+
 type Props = {
+  systemId: string;
   label: string;
+  handleCheckbox: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  value:boolean;
 }
 
 const ControlledCheckbox:FC<Props> = (props:Props) => {
-  const [checked, setChecked] = React.useState(false);
-
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setChecked(event.target.checked);
-  };
-
   return (
-    <FormControlLabel control={<Checkbox onChange={handleChange} checked={checked} />} label={props.label} />
+    <FormControlLabel control={<Checkbox onChange={props.handleCheckbox} checked={props.value} />} label={props.label} />
   );
 }
 export default ControlledCheckbox;
